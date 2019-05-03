@@ -409,6 +409,7 @@ class CoverageReporter extends _base_reporter.default {
       const thresholdGroups = Object.keys(globalConfig.coverageThreshold);
       const groupTypeByThresholdGroup = {};
       const filesByGlob = {};
+      console.log('####| coveredFiles', coveredFiles);
       const coveredFilesSortedIntoThresholdGroup = coveredFiles.reduce(
         (files, file) => {
           const pathOrGlobMatches = thresholdGroups.reduce(
@@ -476,7 +477,11 @@ class CoverageReporter extends _base_reporter.default {
       }
 
       let errors = [];
+      console.log('####| Some Information');
       thresholdGroups.forEach(thresholdGroup => {
+        console.log('####|', thresholdGroup);
+        console.log('####|', groupTypeByThresholdGroup);
+        console.log('####|', groupTypeByThresholdGroup[thresholdGroup]);
         switch (groupTypeByThresholdGroup[thresholdGroup]) {
           case THRESHOLD_GROUP_TYPES.GLOBAL: {
             const coverage = combineCoverage(
@@ -532,7 +537,7 @@ class CoverageReporter extends _base_reporter.default {
             // If the file specified by path is not found, error is returned.
             if (thresholdGroup !== THRESHOLD_GROUP_TYPES.GLOBAL) {
               errors = errors.concat(
-                `Jest: Coverage data for ${thresholdGroup} was not found.`
+                `!! - Jest: Coverage data for ${thresholdGroup} was not found.`
               );
             }
 
