@@ -1,59 +1,22 @@
-'use strict';
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
-Object.defineProperty(exports, '__esModule', {
-  value: true
-});
-exports.default = void 0;
-
-function _chalk() {
-  const data = _interopRequireDefault(require('chalk'));
-
-  _chalk = function _chalk() {
-    return data;
-  };
-
-  return data;
-}
-
-function _jestUtil() {
-  const data = require('jest-util');
-
-  _jestUtil = function _jestUtil() {
-    return data;
-  };
-
-  return data;
-}
-
-var _base_reporter = _interopRequireDefault(require('./base_reporter'));
-
-var _utils = require('./utils');
-
-var _get_result_header = _interopRequireDefault(require('./get_result_header'));
-
-var _get_snapshot_summary = _interopRequireDefault(
-  require('./get_snapshot_summary')
-);
-
-function _interopRequireDefault(obj) {
-  return obj && obj.__esModule ? obj : {default: obj};
-}
-
-function _defineProperty(obj, key, value) {
-  if (key in obj) {
-    Object.defineProperty(obj, key, {
-      value: value,
-      enumerable: true,
-      configurable: true,
-      writable: true
-    });
-  } else {
-    obj[key] = value;
-  }
-  return obj;
-}
+import {Config} from '@jest/types';
+import {AggregatedResult, SnapshotSummary} from '@jest/test-result';
+import chalk from 'chalk';
+import {testPathPatternToRegExp} from 'jest-util';
+import {Context, ReporterOnStartOptions} from './types';
+import BaseReporter from './base_reporter';
+import {getSummary} from './utils';
+import getResultHeader from './get_result_header';
+import getSnapshotSummary from './get_snapshot_summary';
 
 const TEST_SUMMARY_THRESHOLD = 20;
+
 const NPM_EVENTS = new Set([
   'prepublish',
   'publish',
@@ -78,49 +41,50 @@ const NPM_EVENTS = new Set([
   'poststart',
   'prerestart',
   'restart',
-  'postrestart'
+  'postrestart',
 ]);
-const _process$env = process.env,
-  npm_config_user_agent = _process$env.npm_config_user_agent,
-  npm_lifecycle_event = _process$env.npm_lifecycle_event,
-  npm_lifecycle_script = _process$env.npm_lifecycle_script;
 
-class SummaryReporter extends _base_reporter.default {
-  constructor(globalConfig) {
+const {
+  npm_config_user_agent,
+  npm_lifecycle_event,
+  npm_lifecycle_script,
+} = process.env;
+
+export default class SummaryReporter extends BaseReporter {
+  private _estimatedTime: number;
+  private _globalConfig: Config.GlobalConfig;
+
+  constructor(globalConfig: Config.GlobalConfig) {
     super();
-
-    _defineProperty(this, '_estimatedTime', void 0);
-
-    _defineProperty(this, '_globalConfig', void 0);
-
     this._globalConfig = globalConfig;
     this._estimatedTime = 0;
-  } // If we write more than one character at a time it is possible that
+  }
+
+  // If we write more than one character at a time it is possible that
   // Node.js exits in the middle of printing the result. This was first observed
   // in Node.js 0.10 and still persists in Node.js 6.7+.
   // Let's print the test failure summary character by character which is safer
   // when hundreds of tests are failing.
-
-  _write(string) {
+  private _write(string: string) {
     for (let i = 0; i < string.length; i++) {
       process.stderr.write(string.charAt(i));
     }
   }
 
-  onRunStart(aggregatedResults, options) {
+  onRunStart(
+    aggregatedResults: AggregatedResult,
+    options: ReporterOnStartOptions,
+  ) {
     super.onRunStart(aggregatedResults, options);
     this._estimatedTime = options.estimatedTime;
   }
 
-  onRunComplete(contexts, aggregatedResults) {
-    const numTotalTestSuites = aggregatedResults.numTotalTestSuites,
-      testResults = aggregatedResults.testResults,
-      wasInterrupted = aggregatedResults.wasInterrupted;
-
+  onRunComplete(contexts: Set<Context>, aggregatedResults: AggregatedResult) {
+    const {numTotalTestSuites, testResults, wasInterrupted} = aggregatedResults;
     if (numTotalTestSuites) {
-      const lastResult = testResults[testResults.length - 1]; // Print a newline if the last test did not fail to line up newlines
+      const lastResult = testResults[testResults.length - 1];
+      // Print a newline if the last test did not fail to line up newlines
       // similar to when an error would have been thrown in the test.
-
       if (
         !this._globalConfig.verbose &&
         lastResult &&
@@ -131,31 +95,32 @@ class SummaryReporter extends _base_reporter.default {
       }
 
       this._printSummary(aggregatedResults, this._globalConfig);
-
       this._printSnapshotSummary(
         aggregatedResults.snapshot,
-        this._globalConfig
+        this._globalConfig,
       );
 
       if (numTotalTestSuites) {
-        let message = (0, _utils.getSummary)(aggregatedResults, {
-          estimatedTime: this._estimatedTime
+        let message = getSummary(aggregatedResults, {
+          estimatedTime: this._estimatedTime,
         });
 
         if (!this._globalConfig.silent) {
           message +=
             '\n' +
             (wasInterrupted
-              ? _chalk().default.bold.red('Test run was interrupted.')
+              ? chalk.bold.red('Test run was interrupted.')
               : this._getTestSummary(contexts, this._globalConfig));
         }
-
         this.log(message);
       }
     }
   }
 
-  _printSnapshotSummary(snapshots, globalConfig) {
+  private _printSnapshotSummary(
+    snapshots: SnapshotSummary,
+    globalConfig: Config.GlobalConfig,
+  ) {
     if (
       snapshots.added ||
       snapshots.filesRemoved ||
@@ -186,36 +151,38 @@ class SummaryReporter extends _base_reporter.default {
         updateCommand = 're-run jest with `-u`';
       }
 
-      const snapshotSummary = (0, _get_snapshot_summary.default)(
+      const snapshotSummary = getSnapshotSummary(
         snapshots,
         globalConfig,
-        updateCommand
+        updateCommand,
       );
       snapshotSummary.forEach(this.log);
+
       this.log(''); // print empty line
     }
   }
 
-  _printSummary(aggregatedResults, globalConfig) {
+  private _printSummary(
+    aggregatedResults: AggregatedResult,
+    globalConfig: Config.GlobalConfig,
+  ) {
     // If there were any failing tests and there was a large number of tests
     // executed, re-print the failing results at the end of execution output.
     const failedTests = aggregatedResults.numFailedTests;
     const runtimeErrors = aggregatedResults.numRuntimeErrorTestSuites;
-
     if (
       failedTests + runtimeErrors > 0 &&
       aggregatedResults.numTotalTestSuites > TEST_SUMMARY_THRESHOLD
     ) {
-      this.log(_chalk().default.bold('Summary of all failing tests'));
+      this.log(chalk.bold('Summary of all failing tests'));
       aggregatedResults.testResults.forEach(testResult => {
-        const failureMessage = testResult.failureMessage;
-
+        const {failureMessage} = testResult;
         if (failureMessage) {
           this._write(
-            (0, _get_result_header.default)(testResult, globalConfig) +
+            getResultHeader(testResult, globalConfig) +
               '\n' +
               failureMessage +
-              '\n'
+              '\n',
           );
         }
       });
@@ -223,25 +190,27 @@ class SummaryReporter extends _base_reporter.default {
     }
   }
 
-  _getTestSummary(contexts, globalConfig) {
+  private _getTestSummary(
+    contexts: Set<Context>,
+    globalConfig: Config.GlobalConfig,
+  ) {
     const getMatchingTestsInfo = () => {
       const prefix = globalConfig.findRelatedTests
         ? ' related to files matching '
         : ' matching ';
+
       return (
-        _chalk().default.dim(prefix) +
-        (0, _jestUtil().testPathPatternToRegExp)(
-          globalConfig.testPathPattern
-        ).toString()
+        chalk.dim(prefix) +
+        testPathPatternToRegExp(globalConfig.testPathPattern).toString()
       );
     };
 
     let testInfo = '';
 
     if (globalConfig.runTestsByPath) {
-      testInfo = _chalk().default.dim(' within paths');
+      testInfo = chalk.dim(' within paths');
     } else if (globalConfig.onlyChanged) {
-      testInfo = _chalk().default.dim(' related to changed files');
+      testInfo = chalk.dim(' related to changed files');
     } else if (globalConfig.testPathPattern) {
       testInfo = getMatchingTestsInfo();
     }
@@ -252,24 +221,21 @@ class SummaryReporter extends _base_reporter.default {
       nameInfo = ' ' + globalConfig.nonFlagArgs.map(p => `"${p}"`).join(', ');
     } else if (globalConfig.testNamePattern) {
       nameInfo =
-        _chalk().default.dim(' with tests matching ') +
+        chalk.dim(' with tests matching ') +
         `"${globalConfig.testNamePattern}"`;
     }
 
     const contextInfo =
       contexts.size > 1
-        ? _chalk().default.dim(' in ') +
-          contexts.size +
-          _chalk().default.dim(' projects')
+        ? chalk.dim(' in ') + contexts.size + chalk.dim(' projects')
         : '';
+
     return (
-      _chalk().default.dim('Ran all test suites') +
+      chalk.dim('Ran all test suites') +
       testInfo +
       nameInfo +
       contextInfo +
-      _chalk().default.dim('.')
+      chalk.dim('.')
     );
   }
 }
-
-exports.default = SummaryReporter;
