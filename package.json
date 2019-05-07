@@ -1,7 +1,7 @@
 {
   "name": "@jest/reporters",
   "description": "Jest's reporters",
-  "version": "24.7.1",
+  "version": "24.7.8",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "dependencies": {
